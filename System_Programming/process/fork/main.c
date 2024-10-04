@@ -24,7 +24,7 @@ int main()
   }
 }
   
-/*  for (; n>0; n--){
+  /*for (; n>0; n--){
     puts(msg); sleep(1);
   }
   
