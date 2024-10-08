@@ -13,6 +13,7 @@ void *char_print(void *parameters){
     for(i=0;i<p->count;++i){
         fputc(p->character, stdout);
     }
+    printf("i = %d", i);
     return NULL;
 }
 
@@ -36,4 +37,8 @@ int main (){
     return 0;
 }
 
-// Still not working correctly.
+// Still not working correctly. (Could be Github)
+
+// gcc main.c -o main -lpthread
+// ./main > results
+// wc -c results
