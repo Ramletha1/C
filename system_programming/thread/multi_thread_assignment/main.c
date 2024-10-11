@@ -3,37 +3,51 @@
 //Compute successive prime numbers (very inef ciently).
 //Return the Nth prime number, where N is the value pointed to by *ARG.v
 
-void* compute_prime (void* arg){
-    int candidate = 2, n = *((int*) arg);
-    while (1){
-        int factor, is_prime = 1;
-        /* Test primality by successive division. */
-        for (factor = 2; factor < candidate; ++factor)
-            if (candidate % factor == 0){
-                is_prime = 0; break; 
-            }
-        /* Is this the prime number we’re looking for? */
-        if (is_prime){
-            if (--n == 0){
-                /* Return the desired prime number as the thread return value. */
-                return (void*) candidate;
-            }
-        }
-        ++candidate;
+#define MAX_NUMBER 50000
+#define MAX_THREAD 5
+
+typedef struct {
+    int start;
+    int end;
+    int* primes;
+    int* count;
+} ThreadArgs;
+
+void* compute_prime (void* arg) {
+    ThreadArgs* args = (ThreadArgs*) arg;
+    int start = args->start;
+    int end = args->end;
+    int* primes = args->primes;
+    int* count = args->count;
+
+    for (int candidate = start; candidate<end; candidate++) {
+        if (candidate<2) continue;
+        //.......
     }
-    return NULL;
 }
 
-int main (){
-    pthread_t thread;
-    int which_prime = 5133, prime;
-    /* Start the computing thread, up to the 5,133th prime number. */
-    pthread_create (&thread, NULL, &compute_prime, &which_prime);
-    /* Do some other work here... */
-    /* Wait for the prime number thread to complete, and get the result. */
-    pthread_join (thread, (void*) &prime);
-    /*Print the 5,133th prime it computed. */
-    printf("The %dth prime number is %d.\n", which_prime, prime);
+int main () {
+    pthread_t thread[MAX_THREAD];
+    ThreadArgs thread_args[MAX_THREAD];
+    int* primes = malloc(sizeof(int) * MAX_NUMBER);
+    int prime_count = 0;
+
+    for(int count=0; count<MAX_THREAD; count++) {
+        thread_args[i].start = (MAX_NUMBER/MAX_THREAD) * count;
+        thread_args[i].end = (MAX_NUMBER/MAX_THREAD) + thread_args[i].start;
+        thread_args[i].primes = primes;
+        thread_args[i].count = &prime_count;
+        pthread_create(&thread[i], NULL, compute_prime, thread_args[i]);
+    }
+
+    for(int count=0; count<MAX_THREAD; count++) {
+        pthread_join(&thread[i], NULL);
+    }
     
+    printf("Printing all prime number from 0 to %d.\n", MAX_NUMBER);
+    for(int count=0; count<prime_count; count++) {
+        printf("%d\n", primes[count]);
+    }
+
     return 0;
 }
