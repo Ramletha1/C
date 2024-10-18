@@ -13,7 +13,7 @@ void *char_print(void *parameters){
     for(i=0;i<p->count;++i){
         fputc(p->character, stdout);
     }
-    printf("i = %d", i);
+    // printf("i = %d", i);
     return NULL;
 }
 
@@ -23,8 +23,8 @@ int main (){
     struct char_print_parms thread1_args;
     struct char_print_parms thread2_args;
     
-    thread2_args.character = 'x';
-    thread2_args.count = 30000;
+    thread1_args.character = 'x';
+    thread1_args.count = 30000;
     pthread_create(&thread1_id, NULL, &char_print, &thread1_args);
 
     thread2_args.character = 'o';
