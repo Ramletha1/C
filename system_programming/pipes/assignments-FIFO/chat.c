@@ -8,7 +8,7 @@
 
 #define FIFO_1 "./fifo1to2"
 #define FIFO_2 "./fifo2to1"
-#define MAX_RBUF 80
+#define MAX_RBUF 256
 
 
 
@@ -39,44 +39,60 @@ int main(int argc, char *argv[]) {
         }
     }
     ////////////////////////////////////////////////////
-    FIFO_FD1 = open(FIFO_1, O_WRONLY);
-    FIFO_FD2 = open(FIFO_2, O_RDONLY);
+    // FIFO_FD1 = open(FIFO_1, O_WRONLY);
+    // FIFO_FD2 = open(FIFO_2, O_RDONLY);
     argv++;
-    if (strcmp(*argv, "1") == 0) {
+    if (strcmp(*argv, "1") == 0) {  // First Terminal
+        FIFO_FD1 = open(FIFO_1, O_WRONLY);
+        FIFO_FD2 = open(FIFO_2, O_RDONLY);
         child = fork();
         switch (child) {
             case -1: 
                 perror("Forking failed"); 
                 exit(EXIT_FAILURE);
-            case 0: 
+            case 0: // CHILD PROCESS = READ
                 while (strncmp(rbuf, "end chat", 8)) {
-                    //////////////// Put your code here ////////////////
-                    read(FIFO_FD2,...);
-                    write(1,...);
+                    // CODE HERE //
+                    memset(rbuf, 0, MAX_RBUF);
+                    nbytes = read(FIFO_FD2, rbuf, MAX_RBUF);
+                    if (nbytes>0) {
+                        printf("Received: %s", rbuf);
+                    }
                 }
                 break;
-            default:
+            default: // PARENT PROCESS = WRITE
                 while (strncmp(rbuf, "end chat", 8)) {
-                    //////////////// Put your code here ////////////////
-                    read(0,...);
-                    write(FIFO_FD1,...);
+                    // CODE HERE //
+                    memset(rbuf, 0, MAX_RBUF);
+                    fgets(rbuf, MAX_RBUF, stdin);   // step 1: read from stdin at terminal 1
+                    write(FIFO_FD1, rbuf, strlen(rbuf) + 1); // step 2: write to FIFO_FD1
                 }
         }
     }
-    else if (strcmp(*argv, "2") == 0) {
+    else if (strcmp(*argv, "2") == 0) { // Second Terminal
+        FIFO_FD1 = open(FIFO_1, O_RDONLY);
+        FIFO_FD2 = open(FIFO_2, O_WRONLY);
         child = fork();
-        switch (child) {
+        switch (child) {    // Mirror from Terminal 1
             case -1:
                 perror("Forking failed");
                 exit(EXIT_FAILURE);
-            case 0:
+            case 0: // CHILD PROCESS = READ
                 while (strncmp(rbuf, "end chat", 8)) {
-                    //////////////// Put your code here ////////////////
+                    // CODE HERE //
+                    memset(rbuf, 0, MAX_RBUF);
+                    nbytes = read(FIFO_FD1, rbuf, MAX_RBUF); // step 3: read from FIFO_FD1
+                    if (nbytes>0) {
+                        printf("Received: %s", rbuf); // step 4: display at terminal 2
+                    }
                 }
                 break;
-            default:
+            default: // PARENT PROCESS = WRITE
                 while (strncmp(rbuf, "end chat", 8)) {
-                    //////////////// Put your code here ////////////////
+                    // CODE HERE //
+                    memset(rbuf, 0, MAX_RBUF);
+                    fgets(rbuf, MAX_RBUF, stdin);
+                    write(FIFO_FD2, rbuf, strlen(rbuf) + 1);
                 }
         }
     }
