@@ -37,3 +37,5 @@ int main(void) {
   }
   exit(EXIT_SUCCESS);
 }
+
+// ipcs <.., -q>
