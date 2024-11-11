@@ -1,45 +1,44 @@
 // Producer.c
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#define MEM_SIZE 4096
+
+#define SHM_NAME "/pshm"
+#define MEM_SIZE 64
 
 struct shm_st {
   int written;
-  char data[BUFSIZ];
+  char data[MEM_SIZE];
 };
 
 int main() {
-  int running = 1, shmid;
+  int running = 1, shmfd, st_size;
   void *sh_mem = NULL;
   struct shm_st *sh_area;
 
   char buffer[BUFSIZ];
-  shmid = shmget((key_t) 1234, MEM_SIZE, 0666 | IPC_CREAT);
-  if (shmid == -1) {
-    fprintf(stderr, "shmget failed\n");
+  st_size = sizeof(struct shm_st);
+  shmfd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0660);
+  if (shmfd == -1) {
+    perror("shm_open failed ");
     exit(EXIT_FAILURE);
   }
   
-  sh_mem = shmat(shmid, NULL, 0);
-  if (sh_mem == (void *)-1) {
-    fprintf(stderr, "shmat failed\n");
-    exit(EXIT_FAILURE);
-  }
-  
-  printf("Memory attached at %X\n", sh_mem);
+  ftruncate(shmfd, st_size);
+  sh_mem = mmap(0, st_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
+  printf("Memory attached at %p\n", sh_mem);
   sh_area = (struct shm_st *)sh_mem;
+  sh_area->written = 0;
 
   while (running) {
     while (sh_area->written) {
-      sleep(1);
-      printf("Waiting...\n");
+      usleep(200);
     }
-    
     printf("Enter data: ");
     fgets(buffer, BUFSIZ, stdin);
     strcpy(sh_area->data, buffer);
@@ -48,10 +47,7 @@ int main() {
       running = 0;
   }
   
-  if (shmdt(sh_mem) == -1) {
-    fprintf(stderr, "shmdt failed\n");
-    exit(EXIT_FAILURE);
-  }
-  
+  munmap(sh_mem, st_size);
+  close(shmfd);
   exit(EXIT_SUCCESS);
 }

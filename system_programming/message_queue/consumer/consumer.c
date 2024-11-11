@@ -31,7 +31,7 @@ int main() {
   ftruncate(shmfd, st_size);
   sh_mem = mmap(0, st_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
   printf("Memory attached at %p\n", sh_mem);
-  sh_area = (struct shm_st *)sh_mem;
+  sh_area = (struct shm_st *) sh_mem;
   sh_area->written = 0;
 
   while (running) {
@@ -43,11 +43,13 @@ int main() {
     }
     usleep(200);
   }
+  
   munmap(sh_mem, st_size);
   close(shmfd);
   if (shm_unlink(SHM_NAME) == -1) {
     perror("shm_unlink failed ");
     exit(EXIT_FAILURE);
   }
+  
   exit(EXIT_SUCCESS);
 }
