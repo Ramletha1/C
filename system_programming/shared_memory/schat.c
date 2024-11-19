@@ -1,4 +1,4 @@
-// Wongsatorn Suwannarit 6581167
+// DEMO
 
 #include <stdio.h>
 #include <stdlib.h>
