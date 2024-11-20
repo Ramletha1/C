@@ -1,3 +1,5 @@
+// Made by Wongsatorn Suwannarit 6581167
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
