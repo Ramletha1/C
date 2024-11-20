@@ -1,110 +1,110 @@
-// DEMO
+// Made by Wongsatorn Suwannarit 6581167
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
-#include <signal.h>
+#include <unistd.h>
 
 #define SHM_KEY 21930
 #define BUFFER_SIZE 1024
 
-struct shared_memory {
-    int turn;              // Indicates whose turn it is (1 or 2)
-    char message[BUFFER_SIZE]; // Stores the message
+struct share_memory {
+  int flag;
+  char text[BUFFER_SIZE];
 };
 
-pid_t pid; // Global process ID for managing forked processes
-
-void terminate_chat(int signum) {
-    printf("\nChat terminated.\n");
-    exit(0);
+void signal_handler(int sig) {
+  printf("\nChat terminated.\n");
+  exit(0);
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) { // Error handling for argument count
-        fprintf(stderr, "Usage: %s <1 or 2>\n", argv[0]);
-        exit(EXIT_FAILURE);
+
+  if (argc != 2) { // argc count == 2 only
+    printf("Usage: %s <1 or 2>\n", argv[0]);
+    exit(EXIT_FAILURE);
+  }
+
+  int chat = atoi(argv[1]);     // process/chat number
+  if (chat != 1 && chat != 2) { // argv == 1,2 only
+    printf("Argument can be only 1 and 2\n");
+    exit(EXIT_FAILURE);
+  }
+
+  key_t key = SHM_KEY;
+  int shmID;
+  void *shm_ptr = NULL;
+  struct share_memory *shm;
+  signal(SIGINT, signal_handler);
+
+  shmID = shmget(key, sizeof(struct share_memory), 0666 | IPC_CREAT); // get shared memory ID
+  if (shmID == -1) {                // failed to get shared memory ID
+    perror("shmget Failed.");
+    exit(EXIT_FAILURE);
+  }
+
+  shm_ptr = shmat(shmID, NULL, 0); // attach to shared memory
+  if (shm_ptr == (void *)-1) {     // failed to attach
+    perror("shmat Failed.");
+    exit(EXIT_FAILURE);
+  }
+  printf("Memory attached (%X)\n", shm_ptr); // just indicator
+
+  shm = (struct share_memory *)shm_ptr;
+
+  if (chat == 1) {
+    shm->flag = 1;
+    memset(shm->text, 0, BUFFER_SIZE);
+  } /* else {
+    shm->flag = 2;
+  }*/
+
+  printf("Chat started. Type 'end chat' to end program.\n");
+
+  while (1) {
+    if (shm->flag == chat) {
+      printf("You: ");
+      fgets(shm->text, BUFFER_SIZE, stdin);
+      shm->text[strcspn(shm->text, "\n")] = '\0';
     }
 
-    int process = atoi(argv[1]);
-    if (process != 1 && process != 2) { // Error handling for invalid argument
-        fprintf(stderr, "Argument must be 1 or 2\n");
-        exit(EXIT_FAILURE);
+    if (strcmp(shm->text, "end chat") == 0) {
+      printf("You ended the chat.\n");
+      shm->flag = 0;
+      break;
     }
-
-    // Create or access shared memory
-    int shmid = shmget(SHM_KEY, sizeof(struct shared_memory), 0666 | IPC_CREAT);
-    if (shmid == -1) { // Error handling for shared memory creation
-        perror("Failed to create or access shared memory");
-        exit(EXIT_FAILURE);
+    
+    shm->flag = (chat == 1) ? 2 : 1;
+    // if (chat == 1) shm->flah = 2;
+    // else shm->flag = 1;
+    
+    if (shm->flag == 0) {
+      printf("Other side ended the chat.");
+      break;
+    } else {
+      if (strlen(shm->text) > 0) {
+        printf("\nReceived: %s\n", shm->text);
+        memset(shm->text, 0, BUFFER_SIZE);
+      }
+      usleep(100000);
     }
+  }
 
-    // Attach to shared memory
-    struct shared_memory *shm = (struct shared_memory *)shmat(shmid, NULL, 0);
-    if (shm == (void *)-1) { // Error handling for shared memory attachment
-        perror("Failed to attach to shared memory");
-        exit(EXIT_FAILURE);
+
+  if (shmdt(shm_ptr) == -1) {  // shared memory detach
+    printf("shmdt Failed.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (chat == 1) {  // main chat (1)
+    if (shmctl(shmID, IPC_RMID, NULL) == -1) {  // shared memory control
+      printf("shmctl Failed.");
+    } else {
+      printf("Share memory cleaned up.\n");
     }
-
-    // Initialize shared memory if process is 1
-    if (process == 1) {
-        shm->turn = 1; // Process 1 starts the conversation
-        memset(shm->message, 0, BUFFER_SIZE); // Clear the message buffer
-    }
-
-    // Set up signal handler for termination (Ctrl+C)
-    signal(SIGINT, terminate_chat);
-
-    printf("Chat started. Type 'end chat' to quit.\n");
-
-    // Chat loop
-    while (1) {
-        if (shm->turn == process) { // This process's turn to send
-            printf("You: ");
-            fgets(shm->message, BUFFER_SIZE, stdin);
-            shm->message[strcspn(shm->message, "\n")] = 0; // Remove newline character
-
-            if (strcmp(shm->message, "end chat") == 0) { // Check for termination
-                printf("You have ended the chat.\n");
-                shm->turn = 3 - process; // Pass turn to the other process
-                break;
-            }
-
-            shm->turn = 3 - process; // Pass turn to the other process
-        } else { // This process's turn to receive
-            if (shm->turn == 0) { // Indicates chat termination
-                printf("Other side has left the chat.\n");
-                break;
-            }
-
-            if (strlen(shm->message) > 0) { // Wait until a message is written
-                printf("\nReceived: %s\n", shm->message);
-                memset(shm->message, 0, BUFFER_SIZE); // Clear the message after reading
-            }
-            usleep(100000); // Prevent busy-waiting
-        }
-    }
-
-    // Cleanup for process 1
-    if (process == 1) {
-        shm->turn = 0; // Indicate termination
-        if (shmdt(shm) == -1) {
-            perror("Failed to detach shared memory");
-        }
-        if (shmctl(shmid, IPC_RMID, NULL) == -1) {
-            perror("Failed to remove shared memory");
-        }
-        printf("Shared memory cleaned up.\n");
-    } else { // Detach for process 2
-        if (shmdt(shm) == -1) {
-            perror("Failed to detach shared memory");
-        }
-    }
-
-    printf("Chat ended.\n");
-    return 0;
+  }
 }
