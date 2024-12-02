@@ -9,8 +9,8 @@
 #include <signal.h>
 
 #define BUFSIZE 0x100
-struct mmap_struct *file_memory; // pointer to mapped memory structure
-int FILE_LENGTH = 1024; //it has to be bigger than BUFSIZE
+struct mmap_struct *file_memory;
+int FILE_LENGTH = 1024;
 
 void signal_handler(int SIGNO){
   munmap(file_memory, FILE_LENGTH);
@@ -27,7 +27,8 @@ struct mmap_struct {
 int main(int argc, char *const argv[]) {
   char buffer[BUFSIZ];
   int fd;
-  int nread,chat_log; //chat_log = fd for chat_log
+  int nread;
+  int chat_log; //chat_log = fd for chat_log
 
   if (argc < 2) {
     fprintf(stderr, "Usage: %s User has to enter 1 or 2 as argv\n", *argv);
