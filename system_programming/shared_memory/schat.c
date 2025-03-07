@@ -17,9 +17,13 @@ struct share_memory {
   char text[BUFFER_SIZE];
 };
 
+struct share_memory *shm;
+
 void signal_handler(int sig) {
-  printf("\nChat terminated.\n");
-  exit(0);
+  if      (sig == 10) shm->flag = 1;    // 10 = SIGUSR1
+  else if (sig == 12) shm->flag = 2;    // 12 = SIGUSR2
+  else if (sig == 1)  shm->flag = -1;   // 1 = SIGHUP
+  else if (sig == 2)  exit(0);          // 2 = SIGINT
 }
 
 int main(int argc, char *argv[]) {
@@ -38,8 +42,11 @@ int main(int argc, char *argv[]) {
   key_t key = SHM_KEY;
   int shmID;
   void *shm_ptr = NULL;
-  struct share_memory *shm;
-  signal(SIGINT, signal_handler);
+  // struct share_memory *shm;
+  signal(SIGHUP, signal_handler);   // SIGHUP  = 1
+  signal(SIGINT, signal_handler);   // SIGINT  = 2
+  signal(SIGUSR1, signal_handler);  // SIGUSR1 = 10
+  signal(SIGUSR2, signal_handler);  // SIGUSR2 = 12
 
   shmID = shmget(key, sizeof(struct share_memory), 0666 | IPC_CREAT); // get shared memory ID
   if (shmID == -1) {                // failed to get shared memory ID
@@ -52,48 +59,57 @@ int main(int argc, char *argv[]) {
     perror("shmat Failed.");
     exit(EXIT_FAILURE);
   }
-  printf("Memory attached (%X)\n", shm_ptr); // just indicator
+  // printf("Memory attached (%X)\n", shm_ptr); // just indicator
 
   shm = (struct share_memory *)shm_ptr;
-
-  if (chat == 1) {
-    shm->flag = 1;
-    memset(shm->text, 0, BUFFER_SIZE);
-  } /* else {
-    shm->flag = 2;
-  }*/
+  shm->flag = 0;
 
   printf("Chat started. Type 'end chat' to end program.\n");
 
-  while (1) {
-    if (shm->flag == chat) {
-      printf("You: ");
-      fgets(shm->text, BUFFER_SIZE, stdin);
-      shm->text[strcspn(shm->text, "\n")] = '\0';
-    }
+  pid_t pid = fork();
 
-    if (strcmp(shm->text, "end chat") == 0) {
-      printf("You ended the chat.\n");
-      shm->flag = 0;
-      break;
-    }
-    
-    shm->flag = (chat == 1) ? 2 : 1;
-    // if (chat == 1) shm->flah = 2;
-    // else shm->flag = 1;
-    
-    if (shm->flag == 0) {
-      printf("Other side ended the chat.");
-      break;
-    } else {
-      if (strlen(shm->text) > 0) {
-        printf("\nReceived: %s\n", shm->text);
-        memset(shm->text, 0, BUFFER_SIZE);
+  if (pid == 0) {       // Child
+    while (1) {
+      if (strcmp(shm->text, "end chat") == 0) {
+        killpg(getpgid(0), SIGINT);
+        printf("Chat terminated");
+        break;
       }
-      usleep(100000);
+      else if (strlen(shm->text) > 0 && shm->flag != chat) {
+        printf("Received: %s\n", shm->text);
+        memset(shm->text, 0, BUFFER_SIZE);
+        shm->flag = 0;
+      }
     }
   }
-
+  else if (pid > 0) {   // Parent
+    while (1) {
+      if (shm->flag == 0) {
+        if (chat == 1) {
+          // printf("You: ");
+          fgets(shm->text, BUFFER_SIZE, stdin);
+          shm->text[strcspn(shm->text, "\n")] = '\0';
+          if (strcmp(shm->text, "end chat") == 0) {
+            killpg(getpgid(0), SIGINT);
+            printf("Chat terminated");
+            break;
+          }
+          kill(getpid(), SIGUSR1);
+        }
+        else if (chat == 2) {
+          // printf("You: ");
+          fgets(shm->text, BUFFER_SIZE, stdin);
+          shm->text[strcspn(shm->text, "\n")] = '\0';
+          if (strcmp(shm->text, "end chat") == 0) {
+            killpg(getpgid(0), SIGINT);
+            printf("Chat terminated");
+            break;
+          }
+          kill(getpid(), SIGUSR2);
+        }
+      }
+    }
+  }
 
   if (shmdt(shm_ptr) == -1) {  // shared memory detach
     printf("shmdt Failed.");
